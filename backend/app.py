@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import json
 
 from urllib3 import request
@@ -74,9 +74,21 @@ async def scan_url(request: URLScanRequest):
         # --- ML Integration ---
         ml_score = predict_phishing(request.url)
         rule_score = result.get("risk_score", 0.0)
-        final_score = (rule_score + ml_score) / 2
         
+        # If rule score is 0 (whitelisted), it stays 0 regardless of ML
+        if rule_score == 0.0:
+            final_score = 0.0
+        else:
+            # If either score is very high (>= 0.8), we prioritize the high value
+            # This ensures that gc4sh.com (Rule: 0.95) stays high even if ML is low
+            if rule_score >= 0.8 or ml_score >= 0.8:
+                final_score = max(rule_score, ml_score)
+            else:
+                final_score = (rule_score + ml_score) / 2
+        
+        # Reverting threshold to 0.7 as requested
         is_phishing = final_score >= 0.7
+        
         if final_score >= 0.7:
             risk_level = "HIGH"
         elif final_score >= 0.4:
@@ -91,11 +103,12 @@ async def scan_url(request: URLScanRequest):
         result["risk_score"] = final_score
         # ----------------------
 
+        ph_time = datetime.now(timezone(timedelta(hours=8))).isoformat()
         scan_record = {
             "type": "url",
             "input": request.url,
             "result": result,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": ph_time
         }
 
         try:
@@ -112,7 +125,7 @@ async def scan_url(request: URLScanRequest):
             risk_level=risk_level,
             threats=result.get("threats", []),
             explanation=result.get("explanation", ""),
-            timestamp=datetime.utcnow().isoformat()
+            timestamp=ph_time
         )
 
     except Exception as e:
@@ -132,7 +145,14 @@ async def scan_message(request: MessageScanRequest):
         # --- ML Integration ---
         ml_score = predict_phishing(request.message)
         rule_score = result.get("risk_score", 0.0)
-        final_score = (rule_score + ml_score) / 2
+        
+        if rule_score == 0.0:
+            final_score = 0.0
+        else:
+            if rule_score >= 0.8 or ml_score >= 0.8:
+                final_score = max(rule_score, ml_score)
+            else:
+                final_score = (rule_score + ml_score) / 2
         
         is_phishing = final_score >= 0.7
         if final_score >= 0.7:
@@ -149,11 +169,12 @@ async def scan_message(request: MessageScanRequest):
         result["risk_score"] = final_score
         # ----------------------
 
+        ph_time = datetime.now(timezone(timedelta(hours=8))).isoformat()
         scan_record = {
             "type": "message",
             "input": request.message,
             "result": result,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": ph_time
         }
 
         try:
@@ -170,7 +191,7 @@ async def scan_message(request: MessageScanRequest):
             risk_level=risk_level,
             threats=result.get("threats", []),
             explanation=result.get("explanation", ""),
-            timestamp=datetime.utcnow().isoformat()
+            timestamp=ph_time
         )
 
     except Exception as e:
@@ -191,7 +212,12 @@ async def scan_voice(file: UploadFile = File(...)):
         transcript = result.get("transcript", "")
         ml_score = predict_phishing(transcript)
         rule_score = result.get("risk_score", 0.0)
-        final_score = (rule_score + ml_score) / 2
+        
+        # If either score is very high (>= 0.8), we prioritize the high value
+        if rule_score >= 0.8 or ml_score >= 0.8:
+            final_score = max(rule_score, ml_score)
+        else:
+            final_score = (rule_score + ml_score) / 2
         
         is_phishing = final_score >= 0.6
         if final_score >= 0.6:
@@ -208,11 +234,12 @@ async def scan_voice(file: UploadFile = File(...)):
         result["risk_score"] = final_score
         # ----------------------
 
+        ph_time = datetime.now(timezone(timedelta(hours=8))).isoformat()
         scan_record = {
             "type": "voice",
             "filename": file.filename,
             "result": result,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": ph_time
         }
 
         try:
@@ -228,7 +255,7 @@ async def scan_voice(file: UploadFile = File(...)):
             risk_level=risk_level,
             threats=result.get("threats", []),
             explanation=result.get("explanation", ""),
-            timestamp=datetime.utcnow().isoformat()
+            timestamp=ph_time
         )
 
     except Exception as e:

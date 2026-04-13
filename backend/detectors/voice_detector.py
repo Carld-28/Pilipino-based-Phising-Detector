@@ -68,17 +68,17 @@ class VoiceDetector:
             # Check for suspicious voice patterns
             if self._is_robocall(transcript):
                 threats.append("Appears to be automated/robocall")
-                risk_score += 0.2
+                risk_score += 0.3
             
             # Check for urgency language
             urgency_keywords = [
                 "urgent", "immediately", "right away", "asap", "now", "arrest", "warrant", "suspended", "locked", "compromised", "police", "illegal", "unauthorized",
-                "ngayon na", "bilisan", "huli", "pulis", "makukulong", "aresto", "korte", "isuspinde", "na-hack", "madali", "emergency"
+                "ngayon na", "bilisan", "huli", "pulis", "makukulong", "aresto", "korte", "isuspinde", "na-hack", "madali", "emergency", "isara", "blocked", "na-block", "warning", "dead-line", "deadline"
             ]
             urgency_count = sum(1 for keyword in urgency_keywords if keyword in transcript_lower)
             if urgency_count > 0:
                 threats.append(f"Uses urgent or threatening language")
-                risk_score += urgency_count * 0.2
+                risk_score += urgency_count * 0.3
             
             # Check for requests for sensitive info
             sensitive_requests = [
@@ -91,25 +91,25 @@ class VoiceDetector:
             for pattern in sensitive_requests:
                 if re.search(pattern, transcript_lower):
                     threats.append("Requests sensitive information")
-                    risk_score += 0.4
+                    risk_score += 0.6
             
             # Check for bank/financial impersonation
-            financial_mentions = ["bank", "bdo", "bpi", "gcash", "paymaya", "maya", "atm", "card", "credit", "debit", "wallet", "crypto", "bitcoin", "paypal"]
+            financial_mentions = ["bank", "bdo", "bpi", "gcash", "paymaya", "maya", "atm", "card", "credit", "debit", "wallet", "crypto", "bitcoin", "paypal", "landbank", "unionbank", "metrobank", "security bank", "rcbc", "finance", "payout", "remittance", "prize", "nanalo", "jackpot"]
             financial_count = sum(1 for mention in financial_mentions if mention in transcript_lower)
             
             if financial_count > 0:
                 threats.append(f"Mentions financial institution/service")
-                risk_score += financial_count * 0.15
+                risk_score += financial_count * 0.25
             
             # Check for press number prompts
             if self._has_press_prompts(transcript_lower):
                 threats.append("Contains 'press' or number entry prompts")
-                risk_score += 0.3
+                risk_score += 0.4
             
             # Check for unusual phrasing (common in scam calls)
             if self._check_unnatural_speech(transcript):
                 threats.append("Contains unnatural or scripted phrasing")
-                risk_score += 0.2
+                risk_score += 0.3
             
             # Risk level determination
             risk_score = min(risk_score, 1.0)
